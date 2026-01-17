@@ -1,0 +1,25 @@
+{
+  "name": "cerebro-diem",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "clean": "turbo clean && rm -rf node_modules",
+    "mobile": "pnpm --filter @cerebro-diem/mobile",
+    "core": "pnpm --filter @cerebro-diem/core",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:migrate": "supabase db push",
+    "supabase:generate-types": "supabase gen types typescript --project-id epbnucvawcggjmttwwtg > packages/core/src/types/database.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2.3.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
