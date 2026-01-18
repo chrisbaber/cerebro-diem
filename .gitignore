@@ -45,3 +45,21 @@ supabase/.temp/
 
 # Turborepo
 .turbo/
+.vercel
+
+# Desktop app builds
+apps/desktop/release/
+apps/desktop/dist/
+apps/desktop/dist-electron/
+
+# APK and binary releases
+*.apk
+*.tar.gz
+*.exe
+*.AppImage
+
+# Android local config
+apps/mobile/android/local.properties
+
+# Zone identifiers (Windows)
+*:Zone.Identifier

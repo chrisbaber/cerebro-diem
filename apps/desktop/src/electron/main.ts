@@ -1,11 +1,12 @@
 import { app, BrowserWindow, ipcMain, globalShortcut, Tray, Menu, nativeImage } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = !app.isPackaged;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -18,7 +19,6 @@ function createWindow() {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
     },
-    titleBarStyle: 'hiddenInset',
     backgroundColor: '#FFFBFE',
     show: false,
   });
@@ -28,15 +28,25 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    // In production, load from the dist folder relative to the asar
+    const indexPath = path.join(__dirname, '../dist/index.html');
+    mainWindow.loadFile(indexPath);
+    // Open dev tools in production to debug white screen
+    mainWindow.webContents.openDevTools();
   }
+
+  // Show window when ready, with error handling
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load:', errorCode, errorDescription);
+  });
 
   mainWindow.once('ready-to-show', () => {
     mainWindow?.show();
   });
 
+  // Allow closing the window normally (don't hide to tray on Linux by default)
   mainWindow.on('close', (event) => {
-    if (!isQuitting) {
+    if (!isQuitting && process.platform === 'darwin') {
       event.preventDefault();
       mainWindow?.hide();
     }
@@ -44,8 +54,26 @@ function createWindow() {
 }
 
 function createTray() {
-  // Create a simple tray icon (you'd replace this with an actual icon)
-  const icon = nativeImage.createEmpty();
+  // Try to load icon from assets, skip tray if not available
+  const iconPath = isDev
+    ? path.join(__dirname, '../../assets/icon.png')
+    : path.join(process.resourcesPath, 'assets/icon.png');
+
+  let icon: Electron.NativeImage;
+  if (fs.existsSync(iconPath)) {
+    icon = nativeImage.createFromPath(iconPath);
+    // Resize for tray (16x16 on most platforms)
+    icon = icon.resize({ width: 16, height: 16 });
+  } else {
+    // Create a simple colored icon as fallback
+    // Skip tray on Linux if no icon (causes issues)
+    if (process.platform === 'linux') {
+      console.log('No tray icon found, skipping tray on Linux');
+      return;
+    }
+    icon = nativeImage.createEmpty();
+  }
+
   tray = new Tray(icon);
 
   const contextMenu = Menu.buildFromTemplate([

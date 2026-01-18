@@ -1,11 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MMKV } from 'react-native-mmkv';
 
 import { useAuthStore } from '@/stores/authStore';
+import OnboardingScreen from '@/features/onboarding/OnboardingScreen';
+import { initializePushNotifications } from '@/services/notifications';
+
+const storage = new MMKV();
 
 // Auth Screens
 import LoginScreen from '@/features/auth/LoginScreen';
@@ -121,9 +126,32 @@ function MainTabs() {
 export default function Navigation() {
   const { user, isInitialized } = useAuthStore();
   const theme = useTheme();
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingChecked, setOnboardingChecked] = useState(false);
 
-  if (!isInitialized) {
+  useEffect(() => {
+    // Check if onboarding has been completed
+    const completed = storage.getBoolean('onboarding_completed');
+    setShowOnboarding(!completed);
+    setOnboardingChecked(true);
+  }, []);
+
+  // Initialize push notifications when user is logged in
+  useEffect(() => {
+    if (user?.id && !showOnboarding) {
+      initializePushNotifications(user.id);
+    }
+  }, [user?.id, showOnboarding]);
+
+  if (!isInitialized || !onboardingChecked) {
     return null; // Or a loading screen
+  }
+
+  // Show onboarding for new users who are logged in
+  if (user && showOnboarding) {
+    return (
+      <OnboardingScreen onComplete={() => setShowOnboarding(false)} />
+    );
   }
 
   return (

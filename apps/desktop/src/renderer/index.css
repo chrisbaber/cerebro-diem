@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #6750A4;
+  --primary-light: #D0BCFF;
+  --secondary: #625B71;
+  --tertiary: #7D5260;
+  --surface: #FFFBFE;
+  --background: #FFFBFE;
+  --error: #B3261E;
+  --success: #2E7D32;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  background-color: var(--background);
+  color: #1C1B1F;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CAC4D0;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #938F99;
+}
+
+/* Drag region for frameless window */
+.drag-region {
+  -webkit-app-region: drag;
+}
+
+.no-drag {
+  -webkit-app-region: no-drag;
+}

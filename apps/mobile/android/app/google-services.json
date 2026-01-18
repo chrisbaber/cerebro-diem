@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "746523056532",
+    "project_id": "cerebro-diem",
+    "storage_bucket": "cerebro-diem.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:746523056532:android:46e1b1fa202de66c48d781",
+        "android_client_info": {
+          "package_name": "com.cerebrodiem"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA_dSna9F6D8tUUlTLunoGpB0jI3ir8dGs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

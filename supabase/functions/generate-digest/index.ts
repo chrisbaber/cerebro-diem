@@ -247,6 +247,135 @@ serve(async (req) => {
 
     if (digestError) throw digestError;
 
+    // Send push notification via FCM v1 API
+    const fcmServiceAccountJson = Deno.env.get('FCM_SERVICE_ACCOUNT');
+    if (fcmServiceAccountJson) {
+      // Get user's FCM token
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('fcm_token, notifications_enabled')
+        .eq('id', user_id)
+        .single();
+
+      if (profile?.fcm_token && profile?.notifications_enabled !== false) {
+        // Extract first line of digest for notification body
+        const firstLine = digestContent.split('\n').find((line: string) =>
+          line.trim() && !line.startsWith('**') && !line.startsWith('#')
+        ) || 'Your daily digest is ready!';
+
+        // Send push notification
+        try {
+          const serviceAccount = JSON.parse(fcmServiceAccountJson);
+          const projectId = serviceAccount.project_id;
+
+          // Create JWT for OAuth2
+          const header = { alg: 'RS256', typ: 'JWT' };
+          const now = Math.floor(Date.now() / 1000);
+          const jwtPayload = {
+            iss: serviceAccount.client_email,
+            sub: serviceAccount.client_email,
+            aud: 'https://oauth2.googleapis.com/token',
+            iat: now,
+            exp: now + 3600,
+            scope: 'https://www.googleapis.com/auth/firebase.messaging',
+          };
+
+          const encoder = new TextEncoder();
+          const headerB64 = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+          const payloadB64 = btoa(JSON.stringify(jwtPayload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+          const unsignedToken = `${headerB64}.${payloadB64}`;
+
+          const pemContents = serviceAccount.private_key
+            .replace('-----BEGIN PRIVATE KEY-----', '')
+            .replace('-----END PRIVATE KEY-----', '')
+            .replace(/\n/g, '');
+          const binaryKey = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
+
+          const cryptoKey = await crypto.subtle.importKey(
+            'pkcs8',
+            binaryKey,
+            { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+            false,
+            ['sign']
+          );
+
+          const signature = await crypto.subtle.sign(
+            'RSASSA-PKCS1-v1_5',
+            cryptoKey,
+            encoder.encode(unsignedToken)
+          );
+
+          const signatureB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
+            .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+          const jwt = `${unsignedToken}.${signatureB64}`;
+
+          // Get OAuth2 access token
+          const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+          });
+          const tokenData = await tokenResponse.json();
+          const accessToken = tokenData.access_token;
+
+          const notificationTitle = type === 'daily' ? '🎯 Your Daily Digest' : '📊 Weekly Review';
+          const notificationBody = firstLine.replace(/^[-*]\s*/, '').slice(0, 100);
+
+          const fcmPayload = {
+            message: {
+              token: profile.fcm_token,
+              notification: {
+                title: notificationTitle,
+                body: notificationBody,
+              },
+              data: {
+                type: 'digest',
+                digest_id: digest.id,
+              },
+              android: {
+                priority: 'high',
+                notification: {
+                  sound: 'default',
+                  channel_id: 'default',
+                },
+              },
+            },
+          };
+
+          const fcmResponse = await fetch(
+            `https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(fcmPayload),
+            }
+          );
+
+          const fcmResult = await fcmResponse.json();
+
+          // Log the notification
+          await supabase.from('notification_logs').insert({
+            user_id,
+            type: 'digest',
+            title: notificationTitle,
+            body: notificationBody,
+            data: { type: 'digest', digest_id: digest.id },
+            delivered: fcmResponse.ok,
+            error: fcmResponse.ok ? null : JSON.stringify(fcmResult.error),
+          });
+
+          console.log('Push notification sent:', fcmResult);
+        } catch (pushError) {
+          console.error('Failed to send push notification:', pushError);
+          // Don't fail the whole request if push fails
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
