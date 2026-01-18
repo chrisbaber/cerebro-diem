@@ -28,6 +28,7 @@ import TaskDetailScreen from '@/features/browse/TaskDetailScreen';
 import DigestScreen from '@/features/digest/DigestScreen';
 import ReviewQueueScreen from '@/features/review/ReviewQueueScreen';
 import SettingsScreen from '@/features/settings/SettingsScreen';
+import ImportScreen from '@/features/import/ImportScreen';
 
 export type RootStackParamList = {
   Auth: undefined;
@@ -39,6 +40,7 @@ export type RootStackParamList = {
   Digest: undefined;
   ReviewQueue: undefined;
   Settings: undefined;
+  Import: undefined;
 };
 
 export type AuthStackParamList = {
@@ -182,6 +184,11 @@ export default function Navigation() {
               name="Settings"
               component={SettingsScreen}
               options={{ headerShown: true, title: 'Settings' }}
+            />
+            <Stack.Screen
+              name="Import"
+              component={ImportScreen}
+              options={{ headerShown: true, title: 'Import' }}
             />
           </>
         ) : (
