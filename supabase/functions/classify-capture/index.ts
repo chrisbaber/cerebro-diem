@@ -60,7 +60,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')!;
+    const openrouterApiKey = Deno.env.get('OPENROUTER_API_KEY')!
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -110,15 +110,17 @@ serve(async (req) => {
 
     const confidenceThreshold = profile?.confidence_threshold || 0.6;
 
-    // Call OpenAI for classification
-    const openaiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Call OpenRouter for classification
+    const openrouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
+        'Authorization': `Bearer ${openrouterApiKey}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://cerebrodiem.com',
+        'X-Title': 'Cerebro Diem',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'openai/gpt-4o-mini',
         messages: [
           {
             role: 'system',
@@ -134,14 +136,14 @@ serve(async (req) => {
       }),
     });
 
-    if (!openaiResponse.ok) {
-      const errorText = await openaiResponse.text();
-      console.error('OpenAI error:', errorText);
-      throw new Error(`OpenAI API error: ${openaiResponse.status}`);
+    if (!openrouterResponse.ok) {
+      const errorText = await openrouterResponse.text();
+      console.error('OpenRouter error:', errorText);
+      throw new Error(`OpenRouter API error: ${openrouterResponse.status}`);
     }
 
-    const openaiData = await openaiResponse.json();
-    const rawResponse = openaiData.choices[0].message.content;
+    const openrouterData = await openrouterResponse.json();
+    const rawResponse = openrouterData.choices[0].message.content;
 
     // Parse the JSON response
     let classification;

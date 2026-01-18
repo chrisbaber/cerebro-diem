@@ -15,7 +15,8 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY')!;
+    // Use Groq for free Whisper transcription (OpenRouter doesn't support audio)
+    const groqApiKey = Deno.env.get('GROQ_API_KEY')!;
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -54,26 +55,26 @@ serve(async (req) => {
     };
     const contentType = contentTypes[format] || 'audio/mp4';
 
-    // Create form data for Whisper API
+    // Create form data for Groq Whisper API (free, fast, OpenAI-compatible)
     const formData = new FormData();
     const blob = new Blob([audioBytes], { type: contentType });
     formData.append('file', blob, `recording.${format}`);
-    formData.append('model', 'whisper-1');
+    formData.append('model', 'whisper-large-v3');
     formData.append('language', 'en');
 
-    // Call OpenAI Whisper API
-    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    // Call Groq Whisper API (free tier available)
+    const whisperResponse = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${openaiApiKey}`,
+        'Authorization': `Bearer ${groqApiKey}`,
       },
       body: formData,
     });
 
     if (!whisperResponse.ok) {
       const errorText = await whisperResponse.text();
-      console.error('Whisper error:', errorText);
-      throw new Error(`Whisper API error: ${whisperResponse.status}`);
+      console.error('Groq Whisper error:', errorText);
+      throw new Error(`Groq Whisper API error: ${whisperResponse.status}`);
     }
 
     const whisperData = await whisperResponse.json();
