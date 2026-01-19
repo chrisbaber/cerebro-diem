@@ -5,23 +5,31 @@ import { supabase } from '../services/supabase';
 export default function CaptureInput() {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const handleSubmit = async (overrideText?: string) => {
+  const handleSubmit = async (overrideText?: string, source: 'text' | 'voice' = 'text') => {
     const submitText = overrideText || text;
-    if (!submitText.trim() || isProcessing) return;
+    if (!submitText.trim()) return;
 
-    setIsProcessing(true);
+    // Immediately clear input and show "Captured!" - don't block UI
+    setText('');
+    setSuccess('Captured!');
     setError(null);
-    setSuccess(null);
 
+    // Clear success after 2 seconds
+    setTimeout(() => setSuccess(null), 2000);
+
+    // Do the actual save and classification in the background
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      if (!session) {
+        setError('Not authenticated');
+        return;
+      }
 
       // Create capture
       const { data: capture, error: captureError } = await supabase
@@ -29,43 +37,37 @@ export default function CaptureInput() {
         .insert({
           user_id: session.user.id,
           raw_text: submitText.trim(),
-          source: overrideText ? 'voice' : 'text',
+          source,
           processed: false,
         })
         .select()
         .single();
 
-      if (captureError) throw captureError;
+      if (captureError) {
+        console.error('Capture error:', captureError);
+        setError('Failed to save');
+        return;
+      }
 
-      // Trigger classification and wait for it
-      const classifyResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-capture`, {
+      // Trigger classification in background (fire and forget)
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-capture`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ capture_id: capture.id }),
+      }).then(async (response) => {
+        if (!response.ok) {
+          const result = await response.json();
+          console.error('Classification error (background):', result);
+        }
+      }).catch((err) => {
+        console.error('Classification error (background):', err);
       });
-
-      const classifyResult = await classifyResponse.json();
-
-      if (!classifyResponse.ok) {
-        console.error('Classification error:', classifyResult);
-        throw new Error(classifyResult.error || 'Classification failed');
-      }
-
-      // Show success message with category
-      const category = classifyResult.classification?.category || 'item';
-      setSuccess(`Saved as ${category}!`);
-      setText('');
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
       console.error('Submit error:', err);
       setError(err.message);
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -128,13 +130,12 @@ export default function CaptureInput() {
   };
 
   const processAudio = async (audioBlob: Blob) => {
-    setIsProcessing(true);
+    setIsTranscribing(true);
     setError(null);
 
     try {
       // Get fresh session
       const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      console.log('Session check:', !!session, sessionError?.message);
       if (!session) throw new Error('Not authenticated - please log in again');
 
       // Convert to base64
@@ -153,7 +154,6 @@ export default function CaptureInput() {
       const format = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
 
       // Transcribe
-      console.log('Sending audio for transcription, format:', format, 'size:', base64.length);
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
         {
@@ -167,7 +167,6 @@ export default function CaptureInput() {
       );
 
       const responseText = await response.text();
-      console.log('Transcription response:', response.status, responseText);
 
       let result;
       try {
@@ -180,20 +179,17 @@ export default function CaptureInput() {
 
       if (!result.text || result.text.trim() === '') {
         setError('Could not transcribe audio. Please speak clearly and try again.');
-        setIsProcessing(false);
+        setIsTranscribing(false);
         return;
       }
 
-      // Auto-submit the transcribed text
-      const transcribedText = result.text.trim();
-      setText(transcribedText);
-
-      // Submit directly (don't wait for state update)
-      await handleSubmit(transcribedText);
+      // Auto-submit the transcribed text (this returns immediately)
+      setIsTranscribing(false);
+      handleSubmit(result.text.trim(), 'voice');
     } catch (err: any) {
       console.error('Transcription error:', err);
       setError(err.message || 'Transcription failed');
-      setIsProcessing(false);
+      setIsTranscribing(false);
     }
   };
 
@@ -217,20 +213,16 @@ export default function CaptureInput() {
                        focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary
                        resize-none text-on-surface placeholder:text-on-surface-variant"
             rows={1}
-            disabled={isProcessing}
+            disabled={isTranscribing}
           />
           <button
-            onClick={handleSubmit}
-            disabled={!text.trim() || isProcessing}
+            onClick={() => handleSubmit()}
+            disabled={!text.trim()}
             className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-full
                        text-primary hover:bg-primary-container disabled:opacity-50 disabled:cursor-not-allowed
                        transition-colors"
           >
-            {isProcessing ? (
-              <Loader2 size={20} className="animate-spin" />
-            ) : (
-              <Send size={20} />
-            )}
+            <Send size={20} />
           </button>
         </div>
 
@@ -240,20 +232,34 @@ export default function CaptureInput() {
           onMouseLeave={stopRecording}
           onTouchStart={startRecording}
           onTouchEnd={stopRecording}
-          disabled={isProcessing}
+          disabled={isTranscribing}
           className={`p-4 rounded-full transition-all ${
             isRecording
               ? 'bg-error text-white scale-110 animate-pulse'
+              : isTranscribing
+              ? 'bg-primary/50 text-white'
               : 'bg-primary text-white hover:bg-primary/90'
-          } disabled:opacity-50 disabled:cursor-not-allowed`}
+          } disabled:cursor-not-allowed`}
         >
-          {isRecording ? <MicOff size={24} /> : <Mic size={24} />}
+          {isTranscribing ? (
+            <Loader2 size={24} className="animate-spin" />
+          ) : isRecording ? (
+            <MicOff size={24} />
+          ) : (
+            <Mic size={24} />
+          )}
         </button>
       </div>
 
       {isRecording && (
         <p className="text-center text-sm text-on-surface-variant mt-2 animate-pulse">
           Recording... Release to stop
+        </p>
+      )}
+
+      {isTranscribing && (
+        <p className="text-center text-sm text-on-surface-variant mt-2">
+          Transcribing...
         </p>
       )}
 
