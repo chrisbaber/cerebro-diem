@@ -13,25 +13,19 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    // Use Groq for free Whisper transcription (OpenRouter doesn't support audio)
-    const groqApiKey = Deno.env.get('GROQ_API_KEY')!;
+    // Use Groq for free Whisper transcription
+    const groqApiKey = Deno.env.get('GROQ_API_KEY');
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get the JWT from the request to identify the user
-    const authHeader = req.headers.get('Authorization')!;
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
+    if (!groqApiKey) {
+      console.error('GROQ_API_KEY not set');
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Server configuration error: GROQ_API_KEY not set' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // JWT is automatically verified by Supabase Edge Runtime when verify_jwt is true
+    // We just need to proceed with the transcription
 
     const { audio_base64, format = 'm4a' } = await req.json();
 

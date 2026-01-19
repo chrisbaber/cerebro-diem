@@ -11,8 +11,9 @@ export default function CaptureInput() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
-  const handleSubmit = async () => {
-    if (!text.trim() || isProcessing) return;
+  const handleSubmit = async (overrideText?: string) => {
+    const submitText = overrideText || text;
+    if (!submitText.trim() || isProcessing) return;
 
     setIsProcessing(true);
     setError(null);
@@ -27,8 +28,8 @@ export default function CaptureInput() {
         .from('captures')
         .insert({
           user_id: session.user.id,
-          raw_text: text.trim(),
-          source: 'text',
+          raw_text: submitText.trim(),
+          source: overrideText ? 'voice' : 'text',
           processed: false,
         })
         .select()
@@ -131,8 +132,10 @@ export default function CaptureInput() {
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('Not authenticated');
+      // Get fresh session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('Session check:', !!session, sessionError?.message);
+      if (!session) throw new Error('Not authenticated - please log in again');
 
       // Convert to base64
       const reader = new FileReader();
@@ -150,6 +153,7 @@ export default function CaptureInput() {
       const format = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
 
       // Transcribe
+      console.log('Sending audio for transcription, format:', format, 'size:', base64.length);
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
         {
@@ -162,20 +166,33 @@ export default function CaptureInput() {
         }
       );
 
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Transcription failed');
+      const responseText = await response.text();
+      console.log('Transcription response:', response.status, responseText);
+
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Server error: ${responseText.substring(0, 100)}`);
+      }
+
+      if (!response.ok) throw new Error(result.error || `Transcription failed (${response.status})`);
 
       if (!result.text || result.text.trim() === '') {
         setError('Could not transcribe audio. Please speak clearly and try again.');
+        setIsProcessing(false);
         return;
       }
 
-      // Set transcribed text
-      setText(result.text);
+      // Auto-submit the transcribed text
+      const transcribedText = result.text.trim();
+      setText(transcribedText);
+
+      // Submit directly (don't wait for state update)
+      await handleSubmit(transcribedText);
     } catch (err: any) {
       console.error('Transcription error:', err);
       setError(err.message || 'Transcription failed');
-    } finally {
       setIsProcessing(false);
     }
   };
