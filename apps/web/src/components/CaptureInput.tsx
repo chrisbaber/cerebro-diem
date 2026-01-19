@@ -139,7 +139,7 @@ export default function CaptureInput() {
 
     try {
       // Get fresh session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated - please log in again');
 
       // Convert to base64
