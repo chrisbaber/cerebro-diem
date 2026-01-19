@@ -1,6 +1,6 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../services/supabase';
 import debounce from 'lodash/debounce';
 
 interface SearchResult {

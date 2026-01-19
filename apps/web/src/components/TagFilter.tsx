@@ -16,7 +16,7 @@ interface TagData {
   usage_count: number;
 }
 
-export default function TagFilter({ selectedTags, onTagsChange, itemType }: TagFilterProps) {
+export default function TagFilter({ selectedTags, onTagsChange, itemType: _itemType }: TagFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [newTagName, setNewTagName] = useState('');
 

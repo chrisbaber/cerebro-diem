@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Users, Search, Plus } from 'lucide-react';
+import { Users, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '../../services/supabase';
 import TagFilter from '../../components/TagFilter';

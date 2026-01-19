@@ -35,7 +35,7 @@ export default function CaptureInput() {
       if (captureError) throw captureError;
 
       // Trigger classification
-      fetch(`https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/classify-capture`, {
+      fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-capture`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
@@ -110,7 +110,7 @@ export default function CaptureInput() {
 
       // Transcribe
       const response = await fetch(
-        'https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/transcribe-audio',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
         {
           method: 'POST',
           headers: {

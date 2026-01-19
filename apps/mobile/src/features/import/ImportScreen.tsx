@@ -53,7 +53,7 @@ export default function ImportScreen() {
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        `${process.env.SUPABASE_URL || 'https://epbnucvawcggjmttwwtg.supabase.co'}/functions/v1/import-content`,
+        `${process.env.SUPABASE_URL}/functions/v1/import-content`,
         {
           method: 'POST',
           headers: {
@@ -95,7 +95,7 @@ export default function ImportScreen() {
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        `${process.env.SUPABASE_URL || 'https://epbnucvawcggjmttwwtg.supabase.co'}/functions/v1/import-content`,
+        `${process.env.SUPABASE_URL}/functions/v1/import-content`,
         {
           method: 'POST',
           headers: {
@@ -137,7 +137,7 @@ export default function ImportScreen() {
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        `${process.env.SUPABASE_URL || 'https://epbnucvawcggjmttwwtg.supabase.co'}/functions/v1/import-content`,
+        `${process.env.SUPABASE_URL}/functions/v1/import-content`,
         {
           method: 'POST',
           headers: {
@@ -175,7 +175,7 @@ export default function ImportScreen() {
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        `${process.env.SUPABASE_URL || 'https://epbnucvawcggjmttwwtg.supabase.co'}/functions/v1/import-content`,
+        `${process.env.SUPABASE_URL}/functions/v1/import-content`,
         {
           method: 'POST',
           headers: {

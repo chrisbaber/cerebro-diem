@@ -60,7 +60,7 @@ export default function CalendarPage() {
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        'https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/sync-calendar',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar`,
         {
           method: 'POST',
           headers: {

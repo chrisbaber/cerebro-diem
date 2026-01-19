@@ -24,7 +24,7 @@ export default function ImportPage() {
       else body.content = content || text;
 
       const response = await fetch(
-        'https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/import-content',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/import-content`,
         {
           method: 'POST',
           headers: {

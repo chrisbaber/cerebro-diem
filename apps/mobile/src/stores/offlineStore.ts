@@ -121,7 +121,7 @@ export const useOfflineStore = create<OfflineState>()(
               // If it's a voice capture with audio, transcribe first
               if (capture.source === 'voice' && capture.audio_base64) {
                 const transcribeResponse = await fetch(
-                  `https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/transcribe-audio`,
+                  `${process.env.SUPABASE_URL}/functions/v1/transcribe-audio`,
                   {
                     method: 'POST',
                     headers: {
@@ -158,7 +158,7 @@ export const useOfflineStore = create<OfflineState>()(
               if (error) throw error;
 
               // Trigger classification
-              fetch(`https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/classify-capture`, {
+              fetch(`${process.env.SUPABASE_URL}/functions/v1/classify-capture`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${session.access_token}`,

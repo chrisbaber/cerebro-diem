@@ -18,8 +18,12 @@ const mmkvStorageAdapter = {
   },
 };
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://epbnucvawcggjmttwwtg.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVwYm51Y3Zhd2NnZ2ptdHR3d3RnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg2ODMzMjYsImV4cCI6MjA4NDI1OTMyNn0.JUDCiqeTkbZBT2yQw9-lw5w34PKNa_F3FNxiGMeO-EM';
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables: SUPABASE_URL and SUPABASE_ANON_KEY must be set');
+}
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {

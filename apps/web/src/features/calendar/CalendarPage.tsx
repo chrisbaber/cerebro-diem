@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
-import { Calendar, ChevronLeft, ChevronRight, RefreshCw, Link2, Unlink } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, RefreshCw, Link2 } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
 interface CalendarEvent {
@@ -60,7 +60,7 @@ export default function CalendarPage() {
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        'https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/sync-calendar',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-calendar`,
         {
           method: 'POST',
           headers: {

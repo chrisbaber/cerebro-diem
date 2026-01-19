@@ -40,8 +40,20 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signUp: async (email, password) => {
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: `${window.location.origin}/`,
+      },
+    });
     if (error) throw error;
+
+    // Check if email confirmation is required
+    if (data.user && !data.session) {
+      // User created but needs email confirmation
+      throw new Error('Please check your email to confirm your account before signing in.');
+    }
   },
 
   signOut: async () => {

@@ -24,7 +24,7 @@ export default function DigestPage() {
       if (!session) throw new Error('Not authenticated');
 
       const response = await fetch(
-        'https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/generate-digest',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-digest`,
         {
           method: 'POST',
           headers: {

@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Mic, Send, MicOff, Loader2 } from 'lucide-react';
+import { Mic, Send, MicOff, Loader2, CheckCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
 export default function CaptureInput() {
@@ -7,6 +7,7 @@ export default function CaptureInput() {
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
 
@@ -15,6 +16,7 @@ export default function CaptureInput() {
 
     setIsProcessing(true);
     setError(null);
+    setSuccess(null);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -34,18 +36,32 @@ export default function CaptureInput() {
 
       if (captureError) throw captureError;
 
-      // Trigger classification
-      fetch(`https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/classify-capture`, {
+      // Trigger classification and wait for it
+      const classifyResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-capture`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ capture_id: capture.id }),
-      }).catch(console.error);
+      });
 
+      const classifyResult = await classifyResponse.json();
+
+      if (!classifyResponse.ok) {
+        console.error('Classification error:', classifyResult);
+        throw new Error(classifyResult.error || 'Classification failed');
+      }
+
+      // Show success message with category
+      const category = classifyResult.classification?.category || 'item';
+      setSuccess(`Saved as ${category}!`);
       setText('');
+
+      // Clear success message after 3 seconds
+      setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
+      console.error('Submit error:', err);
       setError(err.message);
     } finally {
       setIsProcessing(false);
@@ -54,10 +70,17 @@ export default function CaptureInput() {
 
   const startRecording = async () => {
     try {
+      setError(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm',
-      });
+
+      // Check supported mimeTypes
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4';
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType });
 
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
@@ -69,15 +92,30 @@ export default function CaptureInput() {
       };
 
       mediaRecorder.onstop = async () => {
-        const audioBlob = new Blob(chunksRef.current, { type: 'audio/webm' });
         stream.getTracks().forEach(track => track.stop());
+
+        if (chunksRef.current.length === 0) {
+          setError('No audio recorded. Please try again.');
+          return;
+        }
+
+        const audioBlob = new Blob(chunksRef.current, { type: mimeType });
+        if (audioBlob.size < 1000) {
+          setError('Recording too short. Hold the button longer.');
+          return;
+        }
+
         await processAudio(audioBlob);
       };
 
-      mediaRecorder.start();
+      // Start with timeslice to collect data periodically
+      mediaRecorder.start(100);
       setIsRecording(true);
     } catch (err: any) {
-      setError('Could not access microphone');
+      console.error('Microphone error:', err);
+      setError(err.name === 'NotAllowedError'
+        ? 'Microphone access denied. Please allow microphone access and try again.'
+        : 'Could not access microphone: ' + err.message);
     }
   };
 
@@ -108,26 +146,35 @@ export default function CaptureInput() {
       reader.readAsDataURL(audioBlob);
       const base64 = await base64Promise;
 
+      // Determine format from blob type
+      const format = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
+
       // Transcribe
       const response = await fetch(
-        'https://epbnucvawcggjmttwwtg.supabase.co/functions/v1/transcribe-audio',
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
         {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ audio_base64: base64, format: 'webm' }),
+          body: JSON.stringify({ audio_base64: base64, format }),
         }
       );
 
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error);
+      if (!response.ok) throw new Error(result.error || 'Transcription failed');
+
+      if (!result.text || result.text.trim() === '') {
+        setError('Could not transcribe audio. Please speak clearly and try again.');
+        return;
+      }
 
       // Set transcribed text
       setText(result.text);
     } catch (err: any) {
-      setError(err.message);
+      console.error('Transcription error:', err);
+      setError(err.message || 'Transcription failed');
     } finally {
       setIsProcessing(false);
     }
@@ -196,6 +243,13 @@ export default function CaptureInput() {
       {error && (
         <p className="text-center text-sm text-error mt-2">
           {error}
+        </p>
+      )}
+
+      {success && (
+        <p className="text-center text-sm text-green-600 mt-2 flex items-center justify-center gap-1">
+          <CheckCircle size={16} />
+          {success}
         </p>
       )}
     </div>
