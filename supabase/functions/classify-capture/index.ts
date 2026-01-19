@@ -60,22 +60,17 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const openrouterApiKey = Deno.env.get('OPENROUTER_API_KEY')!
+    const openrouterApiKey = Deno.env.get('OPENROUTER_API_KEY')!;
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Get the JWT from the request to identify the user
-    const authHeader = req.headers.get('Authorization')!;
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
+    if (!openrouterApiKey) {
+      console.error('OPENROUTER_API_KEY not set');
       return new Response(
-        JSON.stringify({ error: 'Unauthorized' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: 'Server configuration error: OPENROUTER_API_KEY not set' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const { capture_id } = await req.json();
 
@@ -91,21 +86,23 @@ serve(async (req) => {
       .from('captures')
       .select('*')
       .eq('id', capture_id)
-      .eq('user_id', user.id)
       .single();
 
     if (captureError || !capture) {
+      console.error('Capture fetch error:', captureError);
       return new Response(
         JSON.stringify({ error: 'Capture not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const userId = capture.user_id;
+
     // Get user's confidence threshold
     const { data: profile } = await supabase
       .from('profiles')
       .select('confidence_threshold')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single();
 
     const confidenceThreshold = profile?.confidence_threshold || 0.6;
@@ -156,7 +153,7 @@ serve(async (req) => {
         .from('classifications')
         .insert({
           capture_id: capture.id,
-          user_id: user.id,
+          user_id: userId,
           category: 'task', // Default
           confidence: 0,
           extracted_fields: {},
@@ -202,7 +199,7 @@ serve(async (req) => {
         case 'person':
           table = 'people';
           insertData = {
-            user_id: user.id,
+            user_id: userId,
             name: extracted.name,
             context: extracted.context || null,
             follow_ups: extracted.follow_ups || [],
@@ -211,7 +208,7 @@ serve(async (req) => {
         case 'project':
           table = 'projects';
           insertData = {
-            user_id: user.id,
+            user_id: userId,
             name: extracted.name,
             status: extracted.status || 'active',
             next_action: extracted.next_action || null,
@@ -221,7 +218,7 @@ serve(async (req) => {
         case 'idea':
           table = 'ideas';
           insertData = {
-            user_id: user.id,
+            user_id: userId,
             title: extracted.title,
             one_liner: extracted.one_liner || null,
             notes: extracted.notes || null,
@@ -230,7 +227,7 @@ serve(async (req) => {
         case 'task':
           table = 'tasks';
           insertData = {
-            user_id: user.id,
+            user_id: userId,
             name: extracted.name,
             due_date: extracted.due_date || null,
             notes: extracted.notes || null,
@@ -257,7 +254,7 @@ serve(async (req) => {
       .from('classifications')
       .insert({
         capture_id: capture.id,
-        user_id: user.id,
+        user_id: userId,
         category,
         confidence,
         extracted_fields: extracted,
