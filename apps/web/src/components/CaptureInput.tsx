@@ -1,6 +1,9 @@
+// CaptureInput v3 - auto-submit voice, no text box
 import { useState, useRef } from 'react';
 import { Mic, Send, MicOff, Loader2, CheckCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
+
+console.log('CaptureInput v3 loaded');
 
 export default function CaptureInput() {
   const [text, setText] = useState('');
@@ -130,6 +133,7 @@ export default function CaptureInput() {
   };
 
   const processAudio = async (audioBlob: Blob) => {
+    console.log('processAudio v3 - starting transcription');
     setIsTranscribing(true);
     setError(null);
 
@@ -184,6 +188,7 @@ export default function CaptureInput() {
       }
 
       // Auto-submit the transcribed text directly (no text box)
+      console.log('processAudio v3 - transcription complete, auto-submitting:', result.text);
       setIsTranscribing(false);
       await handleSubmit(result.text.trim(), 'voice');
     } catch (err: any) {
