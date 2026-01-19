@@ -62,36 +62,41 @@ export async function saveFCMToken(userId: string, token: string): Promise<void>
 
 // Initialize push notifications
 export async function initializePushNotifications(userId: string): Promise<void> {
-  // Request permission
-  const hasPermission = await requestNotificationPermission();
+  try {
+    // Request permission
+    const hasPermission = await requestNotificationPermission();
 
-  if (!hasPermission) {
-    console.log('Push notification permission denied');
-    return;
+    if (!hasPermission) {
+      console.log('Push notification permission denied');
+      return;
+    }
+
+    // Get and save token
+    const token = await getFCMToken();
+    if (token) {
+      await saveFCMToken(userId, token);
+    }
+
+    // Listen for token refresh
+    messaging().onTokenRefresh(async (newToken) => {
+      console.log('FCM Token refreshed:', newToken);
+      await saveFCMToken(userId, newToken);
+    });
+
+    // Handle foreground messages
+    messaging().onMessage(async (remoteMessage) => {
+      console.log('Foreground message:', remoteMessage);
+      // You could show an in-app notification here
+    });
+
+    // Handle background/quit messages
+    messaging().setBackgroundMessageHandler(async (remoteMessage) => {
+      console.log('Background message:', remoteMessage);
+    });
+  } catch (error) {
+    console.warn('Push notification initialization failed:', error);
+    // Don't throw - notifications are non-critical
   }
-
-  // Get and save token
-  const token = await getFCMToken();
-  if (token) {
-    await saveFCMToken(userId, token);
-  }
-
-  // Listen for token refresh
-  messaging().onTokenRefresh(async (newToken) => {
-    console.log('FCM Token refreshed:', newToken);
-    await saveFCMToken(userId, newToken);
-  });
-
-  // Handle foreground messages
-  messaging().onMessage(async (remoteMessage) => {
-    console.log('Foreground message:', remoteMessage);
-    // You could show an in-app notification here
-  });
-
-  // Handle background/quit messages
-  messaging().setBackgroundMessageHandler(async (remoteMessage) => {
-    console.log('Background message:', remoteMessage);
-  });
 }
 
 // Handle notification tap (when app opens from notification)

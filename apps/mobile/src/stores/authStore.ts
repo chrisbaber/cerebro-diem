@@ -28,7 +28,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   initialize: async () => {
     try {
-      const { data } = await supabase.auth.getSession();
+      // Add timeout to prevent app from hanging forever
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Auth initialization timeout')), 10000)
+      );
+
+      const sessionPromise = supabase.auth.getSession();
+
+      const { data } = await Promise.race([sessionPromise, timeoutPromise]);
       set({
         session: data.session,
         user: data.session?.user ?? null,
@@ -43,6 +50,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       });
     } catch (error) {
+      // Always set isInitialized to true so the app can proceed
+      // User will see the login screen if auth failed
+      console.warn('Auth initialization failed:', error);
       set({ isInitialized: true, error: 'Failed to initialize auth' });
     }
   },

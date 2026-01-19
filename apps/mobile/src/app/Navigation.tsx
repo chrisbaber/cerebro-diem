@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator, StyleSheet, Text } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -139,12 +140,21 @@ export default function Navigation() {
   // Initialize push notifications when user is logged in
   useEffect(() => {
     if (user?.id && !showOnboarding) {
-      initializePushNotifications(user.id);
+      initializePushNotifications(user.id).catch((error) => {
+        console.warn('Failed to initialize push notifications:', error);
+      });
     }
   }, [user?.id, showOnboarding]);
 
   if (!isInitialized || !onboardingChecked) {
-    return null; // Or a loading screen
+    return (
+      <View style={loadingStyles.container}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text style={[loadingStyles.text, { color: theme.colors.onSurface }]}>
+          Loading...
+        </Text>
+      </View>
+    );
   }
 
   // Show onboarding for new users who are logged in
@@ -226,3 +236,16 @@ export default function Navigation() {
     </NavigationContainer>
   );
 }
+
+const loadingStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+  },
+  text: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+});
