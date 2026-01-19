@@ -183,9 +183,9 @@ export default function CaptureInput() {
         return;
       }
 
-      // Auto-submit the transcribed text (this returns immediately)
+      // Auto-submit the transcribed text directly (no text box)
       setIsTranscribing(false);
-      handleSubmit(result.text.trim(), 'voice');
+      await handleSubmit(result.text.trim(), 'voice');
     } catch (err: any) {
       console.error('Transcription error:', err);
       setError(err.message || 'Transcription failed');
