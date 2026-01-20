@@ -15,10 +15,12 @@ export default function CaptureInput() {
   const chunksRef = useRef<Blob[]>([]);
 
   const handleSubmit = async (overrideText?: string, source: 'text' | 'voice' = 'text') => {
+    console.log('handleSubmit called - overrideText:', overrideText, 'source:', source);
     const submitText = overrideText || text;
     if (!submitText.trim()) return;
 
     // Immediately clear input and show "Captured!" - don't block UI
+    console.log('handleSubmit - showing Captured!, clearing text');
     setText('');
     setSuccess('Captured!');
     setError(null);
@@ -188,9 +190,12 @@ export default function CaptureInput() {
       }
 
       // Auto-submit the transcribed text directly (no text box)
-      console.log('processAudio v3 - transcription complete, auto-submitting:', result.text);
+      const transcribedText = result.text.trim();
+      console.log('processAudio v3 - transcription complete:', transcribedText);
+      console.log('processAudio v3 - calling handleSubmit directly (NOT setting text state)');
       setIsTranscribing(false);
-      await handleSubmit(result.text.trim(), 'voice');
+      await handleSubmit(transcribedText, 'voice');
+      console.log('processAudio v3 - handleSubmit complete');
     } catch (err: any) {
       console.error('Transcription error:', err);
       setError(err.message || 'Transcription failed');
