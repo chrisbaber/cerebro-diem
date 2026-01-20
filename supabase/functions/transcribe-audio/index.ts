@@ -36,8 +36,21 @@ serve(async (req) => {
       );
     }
 
+    // Log audio data size for debugging
+    console.log(`Received audio: format=${format}, base64_length=${audio_base64.length}`);
+
     // Decode base64 to bytes
     const audioBytes = decode(audio_base64);
+    console.log(`Decoded audio bytes: ${audioBytes.length}`);
+
+    // Validate minimum audio size (roughly 0.1 second of audio)
+    if (audioBytes.length < 1000) {
+      console.error(`Audio too short: ${audioBytes.length} bytes`);
+      return new Response(
+        JSON.stringify({ error: 'Recording too short. Please hold the button longer.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     // Determine content type
     const contentTypes: Record<string, string> = {
@@ -67,8 +80,24 @@ serve(async (req) => {
 
     if (!whisperResponse.ok) {
       const errorText = await whisperResponse.text();
-      console.error('Groq Whisper error:', errorText);
-      throw new Error(`Groq Whisper API error: ${whisperResponse.status}`);
+      console.error(`Groq Whisper error (${whisperResponse.status}):`, errorText);
+
+      // Parse error for user-friendly message
+      let userMessage = `Transcription failed (${whisperResponse.status})`;
+      try {
+        const errorJson = JSON.parse(errorText);
+        if (errorJson.error?.message) {
+          userMessage = errorJson.error.message;
+        }
+      } catch {
+        // Use raw text if not JSON
+        userMessage = errorText || userMessage;
+      }
+
+      return new Response(
+        JSON.stringify({ error: userMessage }),
+        { status: whisperResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const whisperData = await whisperResponse.json();
