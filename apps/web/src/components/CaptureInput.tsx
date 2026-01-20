@@ -1,9 +1,9 @@
-// CaptureInput v4 - fixed touch handling, positioned at bottom
+// CaptureInput v5 - fixed touch handling, positioned at bottom
 import { useState, useRef } from 'react';
 import { Mic, Send, MicOff, Loader2, CheckCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
-console.log('CaptureInput v4 loaded');
+console.log('CaptureInput v5 loaded - ' + new Date().toISOString());
 
 export default function CaptureInput() {
   const [text, setText] = useState('');
