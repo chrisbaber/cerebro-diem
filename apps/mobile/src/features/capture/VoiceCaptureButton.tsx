@@ -1,11 +1,13 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
-  Pressable,
   Animated,
   Platform,
   PermissionsAndroid,
+  PanResponder,
+  GestureResponderEvent,
+  PanResponderGestureState,
 } from 'react-native';
 import { useTheme, Text } from 'react-native-paper';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -24,6 +26,8 @@ export default function VoiceCaptureButton({ onCaptureComplete }: VoiceCaptureBu
   const theme = useTheme();
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const recordingPath = useRef<string>('');
+  const isRecordingRef = useRef(false);
+  const hasPermissionRef = useRef<boolean | null>(null);
 
   const {
     isRecording,
@@ -33,12 +37,15 @@ export default function VoiceCaptureButton({ onCaptureComplete }: VoiceCaptureBu
     startRecording,
     stopRecording,
     updateRecordingDuration,
-    error,
   } = useCaptureStore();
+
+  // Check permissions on mount
+  useEffect(() => {
+    checkPermissions();
+  }, []);
 
   useEffect(() => {
     if (isRecording) {
-      // Pulse animation while recording
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -59,17 +66,34 @@ export default function VoiceCaptureButton({ onCaptureComplete }: VoiceCaptureBu
     }
   }, [isRecording, pulseAnim]);
 
+  const checkPermissions = async (): Promise<boolean> => {
+    if (Platform.OS === 'android') {
+      try {
+        const result = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO
+        );
+        hasPermissionRef.current = result;
+        return result;
+      } catch (err) {
+        console.warn('Permission check failed:', err);
+        return false;
+      }
+    }
+    hasPermissionRef.current = true;
+    return true;
+  };
+
   const requestPermissions = async (): Promise<boolean> => {
     if (Platform.OS === 'android') {
       try {
         const grants = await PermissionsAndroid.requestMultiple([
           PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
         ]);
-
-        return (
+        const granted =
           grants[PermissionsAndroid.PERMISSIONS.RECORD_AUDIO] ===
-          PermissionsAndroid.RESULTS.GRANTED
-        );
+          PermissionsAndroid.RESULTS.GRANTED;
+        hasPermissionRef.current = granted;
+        return granted;
       } catch (err) {
         console.warn(err);
         return false;
@@ -78,14 +102,20 @@ export default function VoiceCaptureButton({ onCaptureComplete }: VoiceCaptureBu
     return true;
   };
 
-  const handlePressIn = async () => {
-    const hasPermission = await requestPermissions();
-    if (!hasPermission) {
-      console.warn('Microphone permission denied');
-      return;
+  const handleStartRecording = useCallback(async () => {
+    if (isRecordingRef.current || isCapturing) return;
+
+    // If we don't have permission, request it first (this will break the touch flow, but that's OK)
+    if (hasPermissionRef.current === false) {
+      const granted = await requestPermissions();
+      if (!granted) {
+        console.warn('Microphone permission denied');
+        return;
+      }
     }
 
     try {
+      isRecordingRef.current = true;
       startRecording();
 
       const path = Platform.select({
@@ -102,35 +132,60 @@ export default function VoiceCaptureButton({ onCaptureComplete }: VoiceCaptureBu
       });
     } catch (err) {
       console.error('Failed to start recording:', err);
+      isRecordingRef.current = false;
       stopRecording();
     }
-  };
+  }, [isCapturing, startRecording, stopRecording, updateRecordingDuration]);
 
-  const handlePressOut = async () => {
-    if (!isRecording) return;
+  const handleStopRecording = useCallback(async () => {
+    if (!isRecordingRef.current) return;
+
+    isRecordingRef.current = false;
 
     try {
-      const result = await audioRecorderPlayer.stopRecorder();
+      await audioRecorderPlayer.stopRecorder();
       audioRecorderPlayer.removeRecordBackListener();
       stopRecording();
 
       if (recordingPath.current) {
-        // Read the file and convert to base64
         const audioBase64 = await RNFS.readFile(recordingPath.current, 'base64');
-
-        // Submit for transcription and capture
         await captureVoice(audioBase64, 'm4a');
-
-        // Clean up the temp file
         await RNFS.unlink(recordingPath.current);
-
         onCaptureComplete?.();
       }
     } catch (err) {
       console.error('Failed to stop recording:', err);
       stopRecording();
     }
-  };
+  }, [captureVoice, stopRecording, onCaptureComplete]);
+
+  // Use PanResponder for reliable touch tracking on Android
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => false,
+      onPanResponderGrant: (
+        _event: GestureResponderEvent,
+        _gestureState: PanResponderGestureState
+      ) => {
+        handleStartRecording();
+      },
+      onPanResponderRelease: (
+        _event: GestureResponderEvent,
+        _gestureState: PanResponderGestureState
+      ) => {
+        handleStopRecording();
+      },
+      onPanResponderTerminate: (
+        _event: GestureResponderEvent,
+        _gestureState: PanResponderGestureState
+      ) => {
+        // Touch was interrupted (e.g., by system gesture)
+        handleStopRecording();
+      },
+      onPanResponderTerminationRequest: () => false, // Don't give up responder
+    })
+  ).current;
 
   const formatDuration = (ms: number): string => {
     const seconds = Math.floor(ms / 1000);
@@ -141,11 +196,13 @@ export default function VoiceCaptureButton({ onCaptureComplete }: VoiceCaptureBu
 
   return (
     <View style={styles.container}>
-      <Pressable
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        disabled={isCapturing}
-        style={styles.buttonContainer}
+      <View
+        {...panResponder.panHandlers}
+        style={[
+          styles.buttonContainer,
+          isCapturing && styles.disabled,
+        ]}
+        pointerEvents={isCapturing ? 'none' : 'auto'}
       >
         <Animated.View
           style={[
@@ -162,7 +219,7 @@ export default function VoiceCaptureButton({ onCaptureComplete }: VoiceCaptureBu
             color="#FFFFFF"
           />
         </Animated.View>
-      </Pressable>
+      </View>
 
       {isRecording && (
         <View style={styles.durationContainer}>
@@ -188,6 +245,9 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     marginBottom: 8,
+  },
+  disabled: {
+    opacity: 0.5,
   },
   button: {
     width: 64,
