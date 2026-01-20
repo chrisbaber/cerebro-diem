@@ -46,7 +46,7 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen bg-background">
-      {/* Mobile menu button */}
+      {/* Mobile menu button - positioned to not overlap content */}
       <button
         className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg bg-surface shadow-lg"
         onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -142,15 +142,15 @@ export default function Layout() {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        {/* Capture input header */}
-        <header className="bg-surface border-b border-surface-variant px-6 py-4">
-          <CaptureInput />
-        </header>
-
-        {/* Page content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        {/* Page content - add padding for mobile menu button and bottom input */}
+        <div className="flex-1 overflow-y-auto p-6 pt-16 lg:pt-6 pb-32">
           <Outlet />
         </div>
+
+        {/* Fixed bottom capture input */}
+        <footer className="fixed bottom-0 left-0 right-0 lg:left-64 bg-surface border-t border-surface-variant px-4 py-3 z-20">
+          <CaptureInput />
+        </footer>
       </main>
     </div>
   );

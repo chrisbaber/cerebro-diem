@@ -5,6 +5,8 @@ import {
   ScrollView,
   RefreshControl,
   Pressable,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {
   Text,
@@ -12,7 +14,6 @@ import {
   Surface,
   useTheme,
   IconButton,
-  Badge,
   ActivityIndicator,
   Snackbar,
 } from 'react-native-paper';
@@ -89,53 +90,140 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Icon name="brain" size={28} color={theme.colors.primary} />
-          <Text variant="titleLarge" style={styles.headerTitle}>
-            Cerebro Diem
-          </Text>
-        </View>
-        <View style={styles.headerRight}>
-          <IconButton
-            icon="bell-outline"
-            onPress={() => navigation.navigate('Digest')}
-          />
-          <IconButton
-            icon="cog-outline"
-            onPress={() => navigation.navigate('Settings')}
-          />
-        </View>
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={loadingCaptures} onRefresh={onRefresh} />
-        }
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]} edges={['top']}>
+      <KeyboardAvoidingView
+        style={styles.keyboardAvoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
-        {/* Capture Input */}
-        <Surface style={styles.captureCard} elevation={1}>
-          <TextInput
-            placeholder="What's on your mind?"
-            value={captureText}
-            onChangeText={setCaptureText}
-            mode="outlined"
-            multiline
-            numberOfLines={3}
-            right={
-              captureText.trim() ? (
-                <TextInput.Icon
-                  icon="send"
-                  onPress={handleTextCapture}
-                  disabled={isCapturing}
-                />
-              ) : null
-            }
-            style={styles.captureInput}
-          />
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerLeft}>
+            <Icon name="brain" size={28} color={theme.colors.primary} />
+            <Text variant="titleLarge" style={styles.headerTitle}>
+              Cerebro Diem
+            </Text>
+          </View>
+          <View style={styles.headerRight}>
+            <IconButton
+              icon="bell-outline"
+              onPress={() => navigation.navigate('Digest')}
+            />
+            <IconButton
+              icon="cog-outline"
+              onPress={() => navigation.navigate('Settings')}
+            />
+          </View>
+        </View>
+
+        {/* Scrollable Content */}
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={loadingCaptures} onRefresh={onRefresh} />
+          }
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Today's Digest */}
+          {digest && !digest.read && (
+            <Pressable onPress={() => navigation.navigate('Digest')}>
+              <Surface style={styles.digestCard} elevation={1}>
+                <View style={styles.digestHeader}>
+                  <Icon name="email-newsletter" size={24} color={theme.colors.primary} />
+                  <Text variant="titleMedium" style={styles.digestTitle}>
+                    Today's Digest
+                  </Text>
+                </View>
+                <Text
+                  variant="bodyMedium"
+                  numberOfLines={4}
+                  style={{ color: theme.colors.onSurfaceVariant }}
+                >
+                  {digest.content.slice(0, 200)}...
+                </Text>
+                <Text variant="labelMedium" style={{ color: theme.colors.primary, marginTop: 8 }}>
+                  View Full Digest →
+                </Text>
+              </Surface>
+            </Pressable>
+          )}
+
+          {/* Needs Review */}
+          {reviewCount > 0 && (
+            <Pressable onPress={() => navigation.navigate('ReviewQueue')}>
+              <Surface style={styles.reviewCard} elevation={1}>
+                <View style={styles.reviewContent}>
+                  <Icon name="inbox" size={24} color={theme.colors.tertiary} />
+                  <Text variant="titleMedium" style={styles.reviewText}>
+                    {reviewCount} item{reviewCount !== 1 ? 's' : ''} need review
+                  </Text>
+                </View>
+                <Icon name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
+              </Surface>
+            </Pressable>
+          )}
+
+          {/* Recent Activity */}
+          <View style={styles.recentSection}>
+            <Text variant="titleMedium" style={styles.sectionTitle}>
+              Recent Activity
+            </Text>
+            {loadingCaptures ? (
+              <ActivityIndicator style={styles.loader} />
+            ) : recentCaptures && recentCaptures.length > 0 ? (
+              recentCaptures.map(capture => (
+                <Surface key={capture.id} style={styles.captureItem} elevation={0}>
+                  <Icon
+                    name="text-box-outline"
+                    size={20}
+                    color={theme.colors.onSurfaceVariant}
+                  />
+                  <Text
+                    variant="bodyMedium"
+                    numberOfLines={2}
+                    style={styles.captureItemText}
+                  >
+                    {capture.raw_text}
+                  </Text>
+                  <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                    {formatTimeAgo(capture.created_at)}
+                  </Text>
+                </Surface>
+              ))
+            ) : (
+              <Text
+                variant="bodyMedium"
+                style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', padding: 24 }}
+              >
+                No captures yet. Start by typing or recording a thought below!
+              </Text>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Fixed Bottom Input */}
+        <Surface style={styles.captureCard} elevation={2}>
+          <View style={styles.inputRow}>
+            <TextInput
+              placeholder="What's on your mind?"
+              value={captureText}
+              onChangeText={setCaptureText}
+              mode="outlined"
+              multiline
+              numberOfLines={2}
+              style={styles.captureInput}
+              right={
+                captureText.trim() ? (
+                  <TextInput.Icon
+                    icon="send"
+                    onPress={handleTextCapture}
+                    disabled={isCapturing}
+                  />
+                ) : null
+              }
+            />
+          </View>
           <View style={styles.captureActions}>
             <VoiceCaptureButton
               onCaptureComplete={() => {
@@ -149,83 +237,7 @@ export default function HomeScreen() {
             </Text>
           </View>
         </Surface>
-
-        {/* Today's Digest */}
-        {digest && !digest.read && (
-          <Pressable onPress={() => navigation.navigate('Digest')}>
-            <Surface style={styles.digestCard} elevation={1}>
-              <View style={styles.digestHeader}>
-                <Icon name="email-newsletter" size={24} color={theme.colors.primary} />
-                <Text variant="titleMedium" style={styles.digestTitle}>
-                  Today's Digest
-                </Text>
-              </View>
-              <Text
-                variant="bodyMedium"
-                numberOfLines={4}
-                style={{ color: theme.colors.onSurfaceVariant }}
-              >
-                {digest.content.slice(0, 200)}...
-              </Text>
-              <Text variant="labelMedium" style={{ color: theme.colors.primary, marginTop: 8 }}>
-                View Full Digest →
-              </Text>
-            </Surface>
-          </Pressable>
-        )}
-
-        {/* Needs Review */}
-        {reviewCount > 0 && (
-          <Pressable onPress={() => navigation.navigate('ReviewQueue')}>
-            <Surface style={styles.reviewCard} elevation={1}>
-              <View style={styles.reviewContent}>
-                <Icon name="inbox" size={24} color={theme.colors.tertiary} />
-                <Text variant="titleMedium" style={styles.reviewText}>
-                  {reviewCount} item{reviewCount !== 1 ? 's' : ''} need review
-                </Text>
-              </View>
-              <Icon name="chevron-right" size={24} color={theme.colors.onSurfaceVariant} />
-            </Surface>
-          </Pressable>
-        )}
-
-        {/* Recent Activity */}
-        <View style={styles.recentSection}>
-          <Text variant="titleMedium" style={styles.sectionTitle}>
-            Recent Activity
-          </Text>
-          {loadingCaptures ? (
-            <ActivityIndicator style={styles.loader} />
-          ) : recentCaptures && recentCaptures.length > 0 ? (
-            recentCaptures.map(capture => (
-              <Surface key={capture.id} style={styles.captureItem} elevation={0}>
-                <Icon
-                  name="text-box-outline"
-                  size={20}
-                  color={theme.colors.onSurfaceVariant}
-                />
-                <Text
-                  variant="bodyMedium"
-                  numberOfLines={2}
-                  style={styles.captureItemText}
-                >
-                  {capture.raw_text}
-                </Text>
-                <Text variant="labelSmall" style={{ color: theme.colors.onSurfaceVariant }}>
-                  {formatTimeAgo(capture.created_at)}
-                </Text>
-              </Surface>
-            ))
-          ) : (
-            <Text
-              variant="bodyMedium"
-              style={{ color: theme.colors.onSurfaceVariant, textAlign: 'center', padding: 24 }}
-            >
-              No captures yet. Start by typing or recording a thought above!
-            </Text>
-          )}
-        </View>
-      </ScrollView>
+      </KeyboardAvoidingView>
 
       <Snackbar
         visible={showSuccess}
@@ -273,6 +285,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  keyboardAvoid: {
+    flex: 1,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -296,12 +311,17 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 16,
   },
   captureCard: {
     padding: 16,
-    borderRadius: 16,
-    marginBottom: 16,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  inputRow: {
+    marginBottom: 12,
   },
   captureInput: {
     backgroundColor: 'transparent',
@@ -310,7 +330,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 12,
     gap: 8,
   },
   digestCard: {

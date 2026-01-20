@@ -1,9 +1,9 @@
-// CaptureInput v3 - auto-submit voice, no text box
+// CaptureInput v4 - fixed touch handling, positioned at bottom
 import { useState, useRef } from 'react';
 import { Mic, Send, MicOff, Loader2, CheckCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
-console.log('CaptureInput v3 loaded');
+console.log('CaptureInput v4 loaded');
 
 export default function CaptureInput() {
   const [text, setText] = useState('');
@@ -13,22 +13,19 @@ export default function CaptureInput() {
   const [success, setSuccess] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const isRecordingRef = useRef(false);
 
   const handleSubmit = async (overrideText?: string, source: 'text' | 'voice' = 'text') => {
     console.log('handleSubmit called - overrideText:', overrideText, 'source:', source);
     const submitText = overrideText || text;
     if (!submitText.trim()) return;
 
-    // Immediately clear input and show "Captured!" - don't block UI
-    console.log('handleSubmit - showing Captured!, clearing text');
     setText('');
     setSuccess('Captured!');
     setError(null);
 
-    // Clear success after 2 seconds
     setTimeout(() => setSuccess(null), 2000);
 
-    // Do the actual save and classification in the background
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
@@ -36,7 +33,6 @@ export default function CaptureInput() {
         return;
       }
 
-      // Create capture
       const { data: capture, error: captureError } = await supabase
         .from('captures')
         .insert({
@@ -54,7 +50,6 @@ export default function CaptureInput() {
         return;
       }
 
-      // Trigger classification in background (fire and forget)
       fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-capture`, {
         method: 'POST',
         headers: {
@@ -62,11 +57,6 @@ export default function CaptureInput() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ capture_id: capture.id }),
-      }).then(async (response) => {
-        if (!response.ok) {
-          const result = await response.json();
-          console.error('Classification error (background):', result);
-        }
       }).catch((err) => {
         console.error('Classification error (background):', err);
       });
@@ -77,11 +67,12 @@ export default function CaptureInput() {
   };
 
   const startRecording = async () => {
+    if (isRecordingRef.current) return;
+
     try {
       setError(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      // Check supported mimeTypes
       const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
@@ -92,6 +83,7 @@ export default function CaptureInput() {
 
       mediaRecorderRef.current = mediaRecorder;
       chunksRef.current = [];
+      isRecordingRef.current = true;
 
       mediaRecorder.ondataavailable = (e) => {
         if (e.data.size > 0) {
@@ -116,11 +108,11 @@ export default function CaptureInput() {
         await processAudio(audioBlob);
       };
 
-      // Start with timeslice to collect data periodically
       mediaRecorder.start(100);
       setIsRecording(true);
     } catch (err: any) {
       console.error('Microphone error:', err);
+      isRecordingRef.current = false;
       setError(err.name === 'NotAllowedError'
         ? 'Microphone access denied. Please allow microphone access and try again.'
         : 'Could not access microphone: ' + err.message);
@@ -128,23 +120,24 @@ export default function CaptureInput() {
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
+    if (!isRecordingRef.current) return;
+
+    isRecordingRef.current = false;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop();
-      setIsRecording(false);
     }
+    setIsRecording(false);
   };
 
   const processAudio = async (audioBlob: Blob) => {
-    console.log('processAudio v3 - starting transcription');
+    console.log('processAudio v4 - starting transcription');
     setIsTranscribing(true);
     setError(null);
 
     try {
-      // Get fresh session
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated - please log in again');
 
-      // Convert to base64
       const reader = new FileReader();
       const base64Promise = new Promise<string>((resolve, reject) => {
         reader.onloadend = () => {
@@ -156,10 +149,8 @@ export default function CaptureInput() {
       reader.readAsDataURL(audioBlob);
       const base64 = await base64Promise;
 
-      // Determine format from blob type
       const format = audioBlob.type.includes('mp4') ? 'mp4' : 'webm';
 
-      // Transcribe
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe-audio`,
         {
@@ -189,13 +180,10 @@ export default function CaptureInput() {
         return;
       }
 
-      // Auto-submit the transcribed text directly (no text box)
       const transcribedText = result.text.trim();
-      console.log('processAudio v3 - transcription complete:', transcribedText);
-      console.log('processAudio v3 - calling handleSubmit directly (NOT setting text state)');
+      console.log('processAudio v4 - transcription complete:', transcribedText);
       setIsTranscribing(false);
       await handleSubmit(transcribedText, 'voice');
-      console.log('processAudio v3 - handleSubmit complete');
     } catch (err: any) {
       console.error('Transcription error:', err);
       setError(err.message || 'Transcription failed');
@@ -210,8 +198,19 @@ export default function CaptureInput() {
     }
   };
 
+  // Touch event handlers - more reliable on mobile
+  const handleTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault(); // Prevent mouse events from also firing
+    startRecording();
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    e.preventDefault();
+    stopRecording();
+  };
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-3xl mx-auto w-full">
       <div className="relative flex items-center gap-2">
         <div className="flex-1 relative">
           <textarea
@@ -239,16 +238,16 @@ export default function CaptureInput() {
         <button
           onMouseDown={startRecording}
           onMouseUp={stopRecording}
-          onMouseLeave={stopRecording}
-          onTouchStart={startRecording}
-          onTouchEnd={stopRecording}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={stopRecording}
           disabled={isTranscribing}
-          className={`p-4 rounded-full transition-all ${
+          className={`p-4 rounded-full transition-all touch-none select-none ${
             isRecording
               ? 'bg-error text-white scale-110 animate-pulse'
               : isTranscribing
               ? 'bg-primary/50 text-white'
-              : 'bg-primary text-white hover:bg-primary/90'
+              : 'bg-primary text-white hover:bg-primary/90 active:scale-95'
           } disabled:cursor-not-allowed`}
         >
           {isTranscribing ? (
