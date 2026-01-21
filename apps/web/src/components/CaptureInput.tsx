@@ -1,11 +1,10 @@
-// CaptureInput v5 - auto-submit voice (no text box), fixed touch handling
-import { useState, useRef } from 'react';
+// CaptureInput v6 - auto-submit voice, refresh activity, fixed touch
+import { useState, useRef, useEffect } from 'react';
 import { Mic, Send, MicOff, Loader2, CheckCircle } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../services/supabase';
 
-console.log('CaptureInput v5 loaded - auto-submit after voice');
-// Uncomment below to test if new code is running:
-// alert('v5 code is running!');
+console.log('CaptureInput v6 loaded');
 
 export default function CaptureInput() {
   const [text, setText] = useState('');
@@ -16,6 +15,25 @@ export default function CaptureInput() {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const isRecordingRef = useRef(false);
+  const queryClient = useQueryClient();
+
+  // Global touch end handler to ensure recording stops even if finger moves off button
+  useEffect(() => {
+    const handleGlobalTouchEnd = () => {
+      if (isRecordingRef.current) {
+        console.log('Global touch end - stopping recording');
+        stopRecording();
+      }
+    };
+
+    document.addEventListener('touchend', handleGlobalTouchEnd);
+    document.addEventListener('touchcancel', handleGlobalTouchEnd);
+
+    return () => {
+      document.removeEventListener('touchend', handleGlobalTouchEnd);
+      document.removeEventListener('touchcancel', handleGlobalTouchEnd);
+    };
+  }, []);
 
   const handleSubmit = async (overrideText?: string, source: 'text' | 'voice' = 'text') => {
     console.log('handleSubmit called - overrideText:', overrideText, 'source:', source);
@@ -52,6 +70,11 @@ export default function CaptureInput() {
         return;
       }
 
+      // Immediately refresh the recent captures list
+      queryClient.invalidateQueries({ queryKey: ['recent-captures'] });
+      queryClient.invalidateQueries({ queryKey: ['review-count'] });
+
+      // Classify in background
       fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/classify-capture`, {
         method: 'POST',
         headers: {
@@ -59,6 +82,10 @@ export default function CaptureInput() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ capture_id: capture.id }),
+      }).then(() => {
+        // Refresh again after classification completes to show the category
+        queryClient.invalidateQueries({ queryKey: ['recent-captures'] });
+        queryClient.invalidateQueries({ queryKey: ['review-count'] });
       }).catch((err) => {
         console.error('Classification error (background):', err);
       });
@@ -183,7 +210,7 @@ export default function CaptureInput() {
       }
 
       const transcribedText = result.text.trim();
-      console.log('processAudio v4 - transcription complete:', transcribedText);
+      console.log('processAudio v6 - transcription complete:', transcribedText);
       setIsTranscribing(false);
       await handleSubmit(transcribedText, 'voice');
     } catch (err: any) {

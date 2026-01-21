@@ -63,3 +63,4 @@ apps/mobile/android/local.properties
 
 # Zone identifiers (Windows)
 *:Zone.Identifier
+.env*.local
