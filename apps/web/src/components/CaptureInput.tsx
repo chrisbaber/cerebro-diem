@@ -1,9 +1,11 @@
-// CaptureInput v4 - fixed touch handling, positioned at bottom
+// CaptureInput v5 - auto-submit voice (no text box), fixed touch handling
 import { useState, useRef } from 'react';
 import { Mic, Send, MicOff, Loader2, CheckCircle } from 'lucide-react';
 import { supabase } from '../services/supabase';
 
-console.log('CaptureInput v4 loaded');
+console.log('CaptureInput v5 loaded - auto-submit after voice');
+// Uncomment below to test if new code is running:
+// alert('v5 code is running!');
 
 export default function CaptureInput() {
   const [text, setText] = useState('');
@@ -130,7 +132,7 @@ export default function CaptureInput() {
   };
 
   const processAudio = async (audioBlob: Blob) => {
-    console.log('processAudio v4 - starting transcription');
+    console.log('processAudio v5 - starting transcription, will auto-submit');
     setIsTranscribing(true);
     setError(null);
 
