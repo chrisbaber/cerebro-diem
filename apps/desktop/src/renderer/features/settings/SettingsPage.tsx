@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Settings, User, Clock, Sliders, Download, Tag, Folder, Palette } from 'lucide-react';
+import { Settings, User, Clock, Sliders, Download, Tag, Folder } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 import { useAuthStore } from '../../stores/authStore';
 

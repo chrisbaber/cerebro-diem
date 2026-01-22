@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, startOfWeek, addDays, isSameDay, parseISO } from 'date-fns';
-import { Calendar, ChevronLeft, ChevronRight, RefreshCw, Link2, Unlink } from 'lucide-react';
+import { Calendar, ChevronLeft, ChevronRight, RefreshCw, Link2 } from 'lucide-react';
 import { supabase } from '../../services/supabase';
 
 interface CalendarEvent {
