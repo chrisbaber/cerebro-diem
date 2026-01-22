@@ -3,6 +3,7 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { MMKV } from 'react-native-mmkv';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '@/services/supabase';
+import { SUPABASE_URL } from '@/config';
 
 const storage = new MMKV({ id: 'offline-store' });
 
@@ -121,7 +122,7 @@ export const useOfflineStore = create<OfflineState>()(
               // If it's a voice capture with audio, transcribe first
               if (capture.source === 'voice' && capture.audio_base64) {
                 const transcribeResponse = await fetch(
-                  `${process.env.SUPABASE_URL}/functions/v1/transcribe-audio`,
+                  `${SUPABASE_URL}/functions/v1/transcribe-audio`,
                   {
                     method: 'POST',
                     headers: {
@@ -158,7 +159,7 @@ export const useOfflineStore = create<OfflineState>()(
               if (error) throw error;
 
               // Trigger classification
-              fetch(`${process.env.SUPABASE_URL}/functions/v1/classify-capture`, {
+              fetch(`${SUPABASE_URL}/functions/v1/classify-capture`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${session.access_token}`,

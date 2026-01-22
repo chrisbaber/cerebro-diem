@@ -68,7 +68,7 @@ export default function ReviewQueueScreen() {
 
   const handleReclassify = (item: ClassificationWithCapture, newCategory: Category) => {
     // Use the existing extracted fields or create minimal ones
-    const extractedFields = item.extracted_fields || {};
+    const extractedFields = (item.extracted_fields || {}) as unknown as Record<string, unknown>;
 
     reclassifyMutation.mutate({
       classificationId: item.id,
@@ -81,7 +81,7 @@ export default function ReviewQueueScreen() {
     reclassifyMutation.mutate({
       classificationId: item.id,
       newCategory: item.category,
-      extractedFields: item.extracted_fields as Record<string, unknown>,
+      extractedFields: item.extracted_fields as unknown as Record<string, unknown>,
     });
   };
 

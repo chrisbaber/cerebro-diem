@@ -1,6 +1,7 @@
 import 'react-native-url-polyfill/auto';
 import { createClient } from '@supabase/supabase-js';
 import { MMKV } from 'react-native-mmkv';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/config';
 
 // MMKV storage for Supabase auth
 const storage = new MMKV({ id: 'supabase-storage' });
@@ -18,14 +19,7 @@ const mmkvStorageAdapter = {
   },
 };
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables: SUPABASE_URL and SUPABASE_ANON_KEY must be set');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: {
     storage: mmkvStorageAdapter,
     autoRefreshToken: true,
